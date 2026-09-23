@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -26,7 +27,39 @@ type client struct {
 	httpCli HTTPClient
 }
 
+func loadDotEnv() {
+	paths := []string{".env", ".env.local"}
+	for _, p := range paths {
+		f, err := os.Open(p)
+		if err != nil {
+			continue
+		}
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			value = strings.Trim(value, "\"'")
+			if _, exists := os.LookupEnv(key); !exists {
+				_ = os.Setenv(key, value)
+			}
+		}
+		_ = scanner.Err()
+	}
+}
+
 func NewClientFromEnv() Client {
+	loadDotEnv()
+
 	apiKey := strings.TrimSpace(os.Getenv("LLM_API_KEY"))
 	if apiKey == "" {
 		apiKey = strings.TrimSpace(os.Getenv("NVIDIA_API_KEY"))
@@ -36,17 +69,17 @@ func NewClientFromEnv() Client {
 		baseURL = strings.TrimSpace(os.Getenv("NVIDIA_API_BASE_URL"))
 	}
 	if baseURL == "" {
-		baseURL = "https://integrate.api.nvidia.com/v1/chat/completions"
+		baseURL = "http://localhost:11434/v1/chat/completions"
 	}
 	model := strings.TrimSpace(os.Getenv("LLM_MODEL"))
 	if model == "" {
 		model = strings.TrimSpace(os.Getenv("NVIDIA_MODEL"))
 	}
 	if model == "" {
-		model = "meta/llama-3.1-70b-instruct"
+		model = "qwen2.5:7b"
 	}
 	if apiKey == "" {
-		if strings.HasPrefix(baseURL, "http://localhost:") || strings.HasPrefix(baseURL, "http://127.0.0.1:") {
+		if strings.HasPrefix(baseURL, "http://localhost:") || strings.HasPrefix(baseURL, "http://127.0.0.1:") || strings.HasPrefix(baseURL, "http://host.docker.internal:") {
 			apiKey = "ollama"
 		} else {
 			return nil
@@ -84,7 +117,9 @@ func (c *client) Generate(ctx context.Context, systemPrompt, userPrompt string) 
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 
 	resp, err := c.httpCli.Do(req)
 	if err != nil {
