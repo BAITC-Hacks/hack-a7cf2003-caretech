@@ -50,3 +50,22 @@ func TestNormalizeProductPreservesArticleAndRecordsConflicts(t *testing.T) {
 		t.Fatal("expected data issue for conflicting current values")
 	}
 }
+
+func TestSearchPrioritizesExactArticleAndSupplierArticleMatches(t *testing.T) {
+	store := NewMemoryStore(DemoProducts())
+	results := store.Search("027228")
+	if len(results) == 0 {
+		t.Fatal("expected search result")
+	}
+	if results[0].SupplierArticle != "027228" {
+		t.Fatalf("expected supplier article match ranked first, got %q", results[0].SupplierArticle)
+	}
+
+	results = store.Search("200300285_")
+	if len(results) == 0 {
+		t.Fatal("expected search result for article")
+	}
+	if results[0].Article != "200300285_" {
+		t.Fatalf("expected article match ranked first, got %q", results[0].Article)
+	}
+}

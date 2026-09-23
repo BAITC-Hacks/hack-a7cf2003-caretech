@@ -31,7 +31,8 @@ func (store *MemoryStore) Search(query string) []Product {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	result := make([]Product, 0)
+	matches := make([]Product, 0)
+	exactMatches := make([]Product, 0)
 	for _, product := range store.products {
 		searchText := strings.ToLower(strings.Join([]string{
 			product.SKU,
@@ -42,11 +43,26 @@ func (store *MemoryStore) Search(query string) []Product {
 			product.Category,
 			product.ProductType,
 		}, " "))
-		if query == "" || strings.Contains(searchText, query) {
-			result = append(result, product)
+		if query == "" {
+			matches = append(matches, product)
+			continue
+		}
+
+		candidate := strings.ToLower(product.SKU) == query ||
+			strings.ToLower(product.Article) == query ||
+			strings.ToLower(product.SupplierArticle) == query
+		if candidate {
+			exactMatches = append(exactMatches, product)
+			continue
+		}
+		if strings.Contains(searchText, query) {
+			matches = append(matches, product)
 		}
 	}
-	return result
+	if len(exactMatches) > 0 {
+		return append(exactMatches, matches...)
+	}
+	return matches
 }
 
 func (store *MemoryStore) FindBySKU(sku string) (Product, bool) {
