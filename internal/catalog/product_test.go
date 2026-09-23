@@ -69,3 +69,18 @@ func TestSearchPrioritizesExactArticleAndSupplierArticleMatches(t *testing.T) {
 		t.Fatalf("expected article match ranked first, got %q", results[0].Article)
 	}
 }
+
+func TestAlternativesMatchCategoryAndCurrent(t *testing.T) {
+	store := NewMemoryStore(DemoProducts())
+	outOfStock := store.Search("EKF-BA-16")[0]
+	alternatives := store.Alternatives(outOfStock)
+	if len(alternatives) == 0 {
+		t.Fatal("expected at least one alternative")
+	}
+	if alternatives[0].Category != outOfStock.Category {
+		t.Fatalf("expected same category, got %q != %q", alternatives[0].Category, outOfStock.Category)
+	}
+	if alternatives[0].Characteristics.Current != outOfStock.Characteristics.Current {
+		t.Fatalf("expected same current rating, got %q != %q", alternatives[0].Characteristics.Current, outOfStock.Characteristics.Current)
+	}
+}

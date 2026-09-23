@@ -81,16 +81,21 @@ func (store *MemoryStore) Alternatives(source Product) []Product {
 		if product.SKU == source.SKU {
 			continue
 		}
-		if product.Stock <= 0 && product.Quantity <= 0 {
+		if product.Quantity <= 0 && product.Stock <= 0 {
 			continue
 		}
 		if product.Category != source.Category {
 			continue
 		}
-		if product.Characteristics.Current == "" || source.Characteristics.Current == "" {
-			continue
-		}
-		if product.Characteristics.Current == source.Characteristics.Current {
+
+		currentMatch := product.Characteristics.Current != "" && source.Characteristics.Current != "" &&
+			strings.EqualFold(strings.TrimSpace(product.Characteristics.Current), strings.TrimSpace(source.Characteristics.Current))
+			voltageMatch := product.Characteristics.Voltage != "" && source.Characteristics.Voltage != "" &&
+			strings.EqualFold(strings.TrimSpace(product.Characteristics.Voltage), strings.TrimSpace(source.Characteristics.Voltage))
+			polesMatch := product.Characteristics.Poles != "" && source.Characteristics.Poles != "" &&
+			strings.EqualFold(strings.TrimSpace(product.Characteristics.Poles), strings.TrimSpace(source.Characteristics.Poles))
+
+		if currentMatch || (voltageMatch && polesMatch) {
 			result = append(result, product)
 		}
 	}
