@@ -3,3 +3,6 @@
 body { margin: 0; min-width: 320px; }
 button, input { font: inherit; }
 button { cursor: pointer; }
+.page-nav { position: fixed; z-index: 20; top: 8px; right: 24px; display: flex; gap: 6px; }
+.page-nav a { padding: 5px 9px; border: 1px solid rgba(255,255,255,.28); border-radius: 12px; color: #dce8f2; background: rgba(20,37,63,.35); text-decoration: none; font-size: 10px; }
+.page-nav a.active { color: #fff; background: #1c89bb; border-color: #1c89bb; }

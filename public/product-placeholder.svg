@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title desc">
+  <title id="title">Фото товара отсутствует</title>
+  <desc id="desc">Нейтральная заглушка для товара без изображения</desc>
+  <rect width="640" height="480" fill="#edf3f4"/>
+  <rect x="188" y="126" width="264" height="190" rx="12" fill="#d9e5e7"/>
+  <path d="M236 270l54-60 43 42 34-34 53 52H236z" fill="#a8c3c7"/>
+  <circle cx="300" cy="188" r="18" fill="#a8c3c7"/>
+  <text x="320" y="363" text-anchor="middle" fill="#6f8c95" font-family="Arial, sans-serif" font-size="22">Фото не получено</text>
+</svg>

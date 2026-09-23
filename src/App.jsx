@@ -5,7 +5,7 @@ import './App.css'
 const demoProducts = [
   { id: '515291', article: '200300285_', name: 'Автоматический выключатель ВА47-100 3P 160А', brand: 'EKF', type: 'Низковольтная аппаратура', price: '64920', quantity: 23, image: 'https://images.unsplash.com/photo-1555963966-b7ae5404b6ed?auto=format&fit=crop&w=700&q=80', data_issues: ['Номинальный ток: 160 А в названии и 250 А в свойстве'], characteristics: [['Полюса', '3P'], ['Напряжение', '400 В'], ['Ток', 'Требует уточнения'], ['Отключающая способность', '10 кА']] },
   { id: '48783', article: '200100442_', name: 'Выключатель автоматический ВА47-100 3P 100А', brand: 'EKF', type: 'Низковольтная аппаратура', price: '42700', quantity: 12, image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=700&q=80', characteristics: [['Полюса', '3P'], ['Напряжение', '400 В'], ['Ток', '100 А'], ['Отключающая способность', '10 кА']] },
-  { id: '23466', article: '300410120_', name: 'Кабель силовой ВВГнг(А)-LS 3х2.5', brand: 'ЭКСПЕРТ-КАБЕЛЬ', type: 'Кабель / Провод', price: '385', quantity: 0, image: 'https://images.unsplash.com/photo-1617897711388-0480c3d7d6d8?auto=format&fit=crop&w=700&q=80', characteristics: [['Жилы', '3'], ['Сечение', '2.5 мм²'], ['Напряжение', '0.66 кВ'], ['Длина', 'Бухта']] },
+  { id: '23466', article: '300410120_', name: 'Кабель силовой ВВГнг(А)-LS 3х2.5', brand: 'ЭКСПЕРТ-КАБЕЛЬ', type: 'Кабель / Провод', price: '385', quantity: 0, image: '/product-placeholder.svg', characteristics: [['Жилы', '3'], ['Сечение', '2.5 мм²'], ['Напряжение', '0.66 кВ'], ['Длина', 'Бухта']] },
 ]
 const suggestions = ['Есть ли 515291?', 'Чем заменить, если нет?', 'Как купить?']
 
@@ -21,11 +21,12 @@ function priceLabel(price) {
 }
 
 function App() {
+  const initialProductId = new URLSearchParams(window.location.search).get('id')
   const [demoMode, setDemoMode] = useState(import.meta.env.VITE_DEMO_MODE === 'true')
   const [query, setQuery] = useState('')
   const [products, setProducts] = useState(demoMode ? demoProducts : [])
-  const [selectedId, setSelectedId] = useState(demoMode ? '515291' : null)
-  const [selectedProduct, setSelectedProduct] = useState(demoMode ? demoProducts[0] : null)
+  const [selectedId, setSelectedId] = useState(demoMode ? initialProductId || '515291' : null)
+  const [selectedProduct, setSelectedProduct] = useState(demoMode ? demoProducts.find((item) => item.id === initialProductId) || demoProducts[0] : null)
   const [messages, setMessages] = useState(demoMode ? [{ from: 'assistant', text: 'Демо-режим включён. Задайте вопрос, например «Есть ли 515291?».' }] : [{ from: 'assistant', text: 'Здравствуйте! Начните с вопроса «Есть ли 515291?» — я обращусь к проверенным данным Go.' }])
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -45,6 +46,7 @@ function App() {
   }
 
   async function openProduct(id) {
+    window.history.pushState({}, '', `product.html?id=${encodeURIComponent(id)}`)
     setSelectedId(id); setError(''); setLoading(true); setAlternatives([])
     if (demoMode) { setSelectedProduct(demoProducts.find((item) => item.id === id) || null); setLoading(false); return }
     try { setSelectedProduct(normalizeProduct(await api.product(id))) } catch (requestError) { setSelectedProduct(null); setError(`Карточку не удалось загрузить: ${requestError.message}`) } finally { setLoading(false) }
@@ -86,7 +88,7 @@ function App() {
 
   function toggleMode() {
     const next = !demoMode; setDemoMode(next); setError(''); setAlternatives([]); setProposal(null); setCartResult(null)
-    if (next) { setProducts(demoProducts); setSelectedProduct(demoProducts[0]); setSelectedId('515291'); setMessages([{ from: 'assistant', text: 'Демо-режим включён. Это локальные данные, не актуальная корзина EKT.' }]) }
+    if (next) { const nextId = initialProductId || '515291'; const nextProduct = demoProducts.find((item) => item.id === nextId) || demoProducts[0]; setProducts(demoProducts); setSelectedProduct(nextProduct); setSelectedId(nextProduct.id); setMessages([{ from: 'assistant', text: 'Демо-режим включён. Это локальные данные, не актуальная корзина EKT.' }]) }
     else { setProducts([]); setSelectedProduct(null); setSelectedId(null); setMessages([{ from: 'assistant', text: 'API-режим включён. Задайте вопрос, чтобы обратиться к Go.' }]) }
   }
 
