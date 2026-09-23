@@ -6,3 +6,7 @@ button { cursor: pointer; }
 .page-nav { position: fixed; z-index: 20; top: 8px; right: 24px; display: flex; gap: 6px; }
 .page-nav a { padding: 5px 9px; border: 1px solid rgba(255,255,255,.28); border-radius: 12px; color: #dce8f2; background: rgba(20,37,63,.35); text-decoration: none; font-size: 10px; }
 .page-nav a.active { color: #fff; background: #1c89bb; border-color: #1c89bb; }
+.page-nav, .catalog-button { display: none; }
+.account-icon { display:inline-flex; align-items:center; justify-content:center; color:#fff; }
+.account-icon svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.cart-link { color:inherit; font-size:12px; text-decoration:none; white-space:nowrap; }
