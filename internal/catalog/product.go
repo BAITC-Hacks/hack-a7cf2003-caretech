@@ -17,24 +17,26 @@ type StoreInfo struct {
 }
 
 type Product struct {
-	ID                int                     `json:"id"`
-	Article           string                  `json:"article,omitempty"`
-	SupplierArticle   string                  `json:"supplier_article,omitempty"`
-	Name              string                  `json:"name"`
-	Description       string                  `json:"description,omitempty"`
-	Price             int                     `json:"price"`
-	Quantity          int                     `json:"quantity"`
-	AvailableStores   []StoreInfo             `json:"available_stores,omitempty"`
-	Brand             string                  `json:"brand,omitempty"`
-	ProductType       string                  `json:"product_type,omitempty"`
-	Category          string                  `json:"category,omitempty"`
-	Characteristics   ProductCharacteristics  `json:"characteristics"`
-	RelatedProductIDs []int                   `json:"related_product_ids,omitempty"`
-	MinimumMultiple   int                     `json:"minimum_multiple,omitempty"`
-	CertificateURLs   []string                `json:"certificate_urls,omitempty"`
-	Image             string                  `json:"image,omitempty"`
-	URL               string                  `json:"url,omitempty"`
-	DataIssues        []string                `json:"data_issues,omitempty"`
+	ID                int                    `json:"id"`
+	Article           string                 `json:"article,omitempty"`
+	SupplierArticle   string                 `json:"supplier_article,omitempty"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description,omitempty"`
+	Price             int                    `json:"price"`
+	Quantity          int                    `json:"quantity"`
+	AvailableStores   []StoreInfo            `json:"available_stores,omitempty"`
+	Brand             string                 `json:"brand,omitempty"`
+	ProductType       string                 `json:"product_type,omitempty"`
+	Category          string                 `json:"category,omitempty"`
+	Characteristics   ProductCharacteristics `json:"characteristics"`
+	Properties        map[string]string      `json:"properties,omitempty"`
+	RelatedProductIDs []int                  `json:"related_product_ids,omitempty"`
+	MinimumMultiple   int                    `json:"minimum_multiple,omitempty"`
+	CertificateURLs   []string               `json:"certificate_urls,omitempty"`
+	Image             string                 `json:"image,omitempty"`
+	URL               string                 `json:"url,omitempty"`
+	DetailAPIURL      string                 `json:"detail_api_url,omitempty"`
+	DataIssues        []string               `json:"data_issues,omitempty"`
 
 	SKU            string `json:"sku,omitempty"`
 	Stock          int    `json:"stock,omitempty"`

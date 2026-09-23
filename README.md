@@ -17,10 +17,15 @@
 ## Запуск
 
 ```powershell
-go run .
+$env:EKT_PRODUCTS_FILES="C:\path\to\ekt_products_page_1.json,C:\path\to\ekt_products_page_2.json"
+go run ./cmd/server
 ```
 
 Сервис запускается на `http://localhost:8080`.
+
+Если `EKT_PRODUCTS_FILES` не задан, backend использует небольшой demo-каталог. Файлы должны быть выгрузками EKT с полем `items`; при совпадении `id` запись из файла, указанного позже, заменяет предыдущую.
+
+Для Ollama или другого OpenAI-compatible сервера можно использовать `LLM_BASE_URL`, `LLM_MODEL` и необязательный `LLM_API_KEY`. Старые переменные `NVIDIA_*` остаются совместимыми.
 
 ## API
 

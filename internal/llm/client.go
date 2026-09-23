@@ -20,24 +20,37 @@ type HTTPClient interface {
 }
 
 type client struct {
-	apiKey   string
-	baseURL  string
-	model    string
-	httpCli  HTTPClient
+	apiKey  string
+	baseURL string
+	model   string
+	httpCli HTTPClient
 }
 
 func NewClientFromEnv() Client {
-	apiKey := strings.TrimSpace(os.Getenv("NVIDIA_API_KEY"))
+	apiKey := strings.TrimSpace(os.Getenv("LLM_API_KEY"))
 	if apiKey == "" {
-		return nil
+		apiKey = strings.TrimSpace(os.Getenv("NVIDIA_API_KEY"))
 	}
-	baseURL := strings.TrimSpace(os.Getenv("NVIDIA_API_BASE_URL"))
+	baseURL := strings.TrimSpace(os.Getenv("LLM_BASE_URL"))
+	if baseURL == "" {
+		baseURL = strings.TrimSpace(os.Getenv("NVIDIA_API_BASE_URL"))
+	}
 	if baseURL == "" {
 		baseURL = "https://integrate.api.nvidia.com/v1/chat/completions"
 	}
-	model := strings.TrimSpace(os.Getenv("NVIDIA_MODEL"))
+	model := strings.TrimSpace(os.Getenv("LLM_MODEL"))
+	if model == "" {
+		model = strings.TrimSpace(os.Getenv("NVIDIA_MODEL"))
+	}
 	if model == "" {
 		model = "meta/llama-3.1-70b-instruct"
+	}
+	if apiKey == "" {
+		if strings.HasPrefix(baseURL, "http://localhost:") || strings.HasPrefix(baseURL, "http://127.0.0.1:") {
+			apiKey = "ollama"
+		} else {
+			return nil
+		}
 	}
 	return &client{
 		apiKey:  apiKey,
