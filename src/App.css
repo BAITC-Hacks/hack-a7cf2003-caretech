@@ -15,8 +15,6 @@ main { max-width:1240px; margin:0 auto; padding:54px 24px 130px; }.welcome-row {
 .inline-detail { width:min(760px, 100%); margin:12px 0 28px 36px; scroll-margin-top:24px; animation: detail-reveal .24s ease-out; }
 .detail-source { margin-top:14px; color:#8b99a8; font-size:9px; }
 @keyframes detail-reveal { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-.mode-chip { border:1px solid #cbdde5; border-radius:14px; padding:6px 10px; background:#fff; color:#39718e; font-size:10px; }
-.mode-chip.demo { border-color:#e5c88e; color:#a36b2d; background:#fff8e9; }
 .api-error, .success-state, .loading-state { display:flex; align-items:center; gap:12px; margin:0 0 20px; padding:12px 15px; border-radius:6px; font-size:11px; }
 .api-error { border:1px solid #f0c7b8; background:#fff3ef; color:#995d4c; }
 .api-error button { margin-left:auto; padding:7px 10px; border:1px solid #d38a72; background:#fff; color:#995d4c; border-radius:4px; font-size:10px; }
