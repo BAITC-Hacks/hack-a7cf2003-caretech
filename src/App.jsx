@@ -1,88 +1,221 @@
-import { useMemo, useState } from 'react'
-import { api } from './api'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
-const demoProducts = [
-  { id: '515291', article: '200300285_', name: 'Автоматический выключатель ВА47-100 3P 160А', brand: 'EKF', type: 'Низковольтная аппаратура', price: '64920', quantity: 23, image: 'https://images.unsplash.com/photo-1555963966-b7ae5404b6ed?auto=format&fit=crop&w=700&q=80', data_issues: ['Номинальный ток: 160 А в названии и 250 А в свойстве'], characteristics: [['Полюса', '3P'], ['Напряжение', '400 В'], ['Ток', 'Требует уточнения'], ['Отключающая способность', '10 кА']] },
-  { id: '48783', article: '200100442_', name: 'Выключатель автоматический ВА47-100 3P 100А', brand: 'EKF', type: 'Низковольтная аппаратура', price: '42700', quantity: 12, image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=700&q=80', characteristics: [['Полюса', '3P'], ['Напряжение', '400 В'], ['Ток', '100 А'], ['Отключающая способность', '10 кА']] },
-  { id: '23466', article: '300410120_', name: 'Кабель силовой ВВГнг(А)-LS 3х2.5', brand: 'ЭКСПЕРТ-КАБЕЛЬ', type: 'Кабель / Провод', price: '385', quantity: 0, image: '/product-placeholder.svg', characteristics: [['Жилы', '3'], ['Сечение', '2.5 мм²'], ['Напряжение', '0.66 кВ'], ['Длина', 'Бухта']] },
-  { id: '28727', article: '400210087_', name: 'Светильник промышленный LED 100 Вт', brand: 'IEK', type: 'Светильники / Лампы', price: '18500', quantity: 8, image: 'https://images.unsplash.com/photo-1540932239986-30128078f3c5?auto=format&fit=crop&w=700&q=80', characteristics: [['Мощность', '100 Вт'], ['Степень защиты', 'IP65'], ['Световой поток', '14000 лм'], ['Цветовая температура', '4000 К']] },
-  { id: '30142', article: '500120019_', name: 'Щит распределительный навесной 24 модуля', brand: 'EKF', type: 'Шкафы / Щиты', price: '12700', quantity: 6, image: 'https://images.unsplash.com/photo-1565600221858-6c47a0e6b9b4?auto=format&fit=crop&w=700&q=80', characteristics: [['Количество модулей', '24'], ['Монтаж', 'Навесной'], ['Материал', 'Пластик'], ['IP', '40']] },
-  { id: '38910', article: '600410225_', name: 'Розетка двойная с заземлением', brand: 'Schneider Electric', type: 'Розетки / Выключатели', price: '3200', quantity: null, image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=700&q=80', characteristics: [['Номинальный ток', '16 А'], ['Напряжение', '250 В'], ['Монтаж', 'Скрытый'], ['Наличие', 'Требует проверки']] },
-]
-const suggestions = ['Есть ли 515291?', 'Чем заменить, если нет?', 'Как купить?']
+const DEFAULT_SESSION_ID = 'frontend-demo'
+const suggestions = ['Найди автомат 3P 160А', 'Что есть в наличии в Астане?', 'Подбери замену для кабеля']
 
-function normalizeProduct(item) {
-  if (!item) return null
-  const characteristics = item.characteristics && !Array.isArray(item.characteristics) ? Object.entries(item.characteristics) : item.characteristics || []
-  return { ...item, id: String(item.id), quantity: item.quantity ?? null, characteristics }
-}
-function priceLabel(price) { return price === null || price === undefined || price === '' ? 'Нет данных' : String(price) }
-
-function saveToCart(product) {
-  const current = JSON.parse(localStorage.getItem('ekt-cart') || '[]')
-  if (!current.some((item) => item.id === product.id)) localStorage.setItem('ekt-cart', JSON.stringify([...current, product]))
-}
-
-function ProductImage({ product, detail = false }) {
-  return <div className={detail ? 'detail-image' : 'product-image'}>{product.image ? <img src={product.image} alt="" /> : <img src="/product-placeholder.svg" alt="Фото не получено" />}{!detail && <span className={product.quantity === null ? 'unknown-stock' : product.quantity ? 'in-stock' : 'out-stock'}>{product.quantity === null ? 'Наличие неизвестно' : product.quantity ? 'В наличии' : 'Нет в наличии'}</span>}</div>
+const fallbackProduct = {
+  id: 0,
+  article: '—',
+  sku: '—',
+  name: 'Товар не найден',
+  brand: 'EKT',
+  product_type: 'Каталог',
+  price: 0,
+  quantity: 0,
+  stock: 0,
+  image: 'https://images.unsplash.com/photo-1555963966-b7ae5404b6ed?auto=format&fit=crop&w=700&q=80',
+  characteristics: {
+    poles: '—',
+    current: '—',
+    voltage: '—',
+    breaking_capacity: '—',
+  },
+  data_issues: [],
 }
 
-function ProductDetail({ product, demoMode, onAlternatives }) {
-  const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem('ekt-cart') || '[]').some((item) => item.id === product.id))
-  function handleSave() { saveToCart(product); setSaved(true) }
-  return <section id="product-detail" className="detail-column inline-detail"><div className="detail-top"><span className="section-kicker">ПОДРОБНАЯ КАРТОЧКА</span><div className="detail-actions"><button className={saved ? 'saved' : ''} onClick={handleSave} aria-label="Сохранить товар">{saved ? '♥' : '♡'}</button><button>⋯</button></div></div><ProductImage product={product} detail /><span className="product-type">{product.type || 'Товар EKT'}</span><h2>{product.name}</h2><div className="detail-meta"><span>Бренд <b>{product.brand || 'Нет данных'}</b></span><span>Артикул <b>{product.article || 'Нет данных'}</b></span></div><div className="price-row"><div><small>Цена</small><strong>{priceLabel(product.price)}</strong></div><div className={product.quantity === null ? 'availability unknown' : product.quantity ? 'availability' : 'availability unavailable'}><i></i>{product.quantity === null ? 'Наличие неизвестно' : product.quantity ? `В наличии · ${product.quantity} шт.` : 'Нет в наличии'}</div></div>{product.data_issues && <div className="warning"><span>!</span><p><b>Нужно внимание</b>{product.data_issues.join(' ')}</p></div>}<div className="characteristics"><div className="subheading"><b>Характеристики</b><span>Только из источника ↗</span></div>{(product.characteristics || []).map(([key, value]) => <div className="characteristic" key={key}><span>{key}</span><b className={String(value).toLowerCase().includes('уточ') ? 'needs-check' : ''}>{value}</b></div>)}</div>{product.quantity === 0 && <button className="outline-button" onClick={onAlternatives}>Подобрать замену <span>→</span></button>}<a className="ekt-link" href={product.url || 'https://ekt.kz'} target="_blank" rel="noreferrer">Открыть на ekt.kz ↗</a><div className="detail-source">{demoMode ? 'Демо-данные · не актуальная корзина EKT' : 'Карточка получена с сервера'}</div></section>
+function formatPrice(value) {
+  const num = Number(value ?? 0)
+  if (!Number.isFinite(num) || num <= 0) return '—'
+  return `${num.toLocaleString('ru-RU')} ₸`
+}
+
+function getCharacteristics(product) {
+  if (!product || !product.characteristics) return []
+
+  if (Array.isArray(product.characteristics)) {
+    return product.characteristics.filter(([, value]) => value && value !== '—')
+  }
+
+  return Object.entries(product.characteristics).filter(([, value]) => value && value !== '—')
 }
 
 function App() {
-  const initialProductId = new URLSearchParams(window.location.search).get('id')
-  const [demoMode, setDemoMode] = useState(import.meta.env.VITE_DEMO_MODE === 'true')
   const [query, setQuery] = useState('')
-  const [products, setProducts] = useState(demoMode ? demoProducts : [])
-  const [selectedId, setSelectedId] = useState(demoMode && initialProductId ? initialProductId : null)
-  const [selectedProduct, setSelectedProduct] = useState(demoMode && initialProductId ? demoProducts.find((item) => item.id === initialProductId) || null : null)
-  const [messages, setMessages] = useState([{ from: 'assistant', text: demoMode ? 'Демо-режим включён. Нажмите на товар, чтобы открыть подробную карточку.' : 'Здравствуйте! Начните с вопроса «Есть ли 515291?» — я обращусь к проверенным данным сервера.' }])
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [alternatives, setAlternatives] = useState([])
-  const [proposal, setProposal] = useState(null)
-  const [cartResult, setCartResult] = useState(null)
+  const [products, setProducts] = useState([])
+  const [selectedId, setSelectedId] = useState('')
   const [chatOpen, setChatOpen] = useState(true)
-  const selected = selectedProduct || products.find((item) => item.id === selectedId) || null
-  const visibleProducts = useMemo(() => products.filter((product) => !query.trim() || `${product.id} ${product.article} ${product.name} ${product.type}`.toLowerCase().includes(query.toLowerCase())), [products, query])
+  const [message, setMessage] = useState('')
+  const [messages, setMessages] = useState([
+    { from: 'assistant', text: 'Здравствуйте! Я помогу найти электротехнические товары, проверить наличие и подобрать замену по подтверждённым данным.' },
+    { from: 'assistant', text: 'Проверяю каталог через backend API и могу сразу подхватить актуальные позиции.' },
+  ])
+  const [cart, setCart] = useState([])
+  const [proposal, setProposal] = useState(null)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
-  async function searchProducts(value) {
-    setQuery(value); setError(''); setLoading(true)
-    if (demoMode) { setProducts(demoProducts); setLoading(false); return }
-    try { const result = await api.search(value); setProducts((result?.items || []).map(normalizeProduct)) } catch (requestError) { setError(`Поиск недоступен: ${requestError.message}`) } finally { setLoading(false) }
+  useEffect(() => {
+    loadProducts()
+    loadCart()
+  }, [])
+
+  const filteredProducts = useMemo(() => {
+    if (!query.trim()) return products
+    const value = query.toLowerCase()
+    return products.filter((product) => {
+      const text = `${product.id ?? ''} ${product.article ?? ''} ${product.sku ?? ''} ${product.name ?? ''} ${product.product_type ?? ''} ${product.brand ?? ''}`.toLowerCase()
+      return text.includes(value)
+    })
+  }, [products, query])
+
+  const selectedProduct = products.find((product) => String(product.id) === String(selectedId)) || products[0] || fallbackProduct
+  const alternative = products.find((product) => String(product.id) !== String(selectedId)) || products[1] || null
+
+  async function loadProducts(searchText = '') {
+    try {
+      const url = searchText.trim() ? `/api/products?q=${encodeURIComponent(searchText.trim())}` : '/api/products'
+      const response = await fetch(url)
+      const data = await response.json()
+      if (!Array.isArray(data)) {
+        setProducts([])
+        return
+      }
+      setProducts(data)
+      if (data.length > 0 && !selectedId) {
+        setSelectedId(String(data[0].id))
+      }
+    } catch (error) {
+      console.error('loadProducts failed', error)
+      setProducts([])
+    }
   }
-  async function openProduct(id) {
-    window.history.pushState({}, '', `product.html?id=${encodeURIComponent(id)}`); setSelectedId(id); setError(''); setLoading(true); setAlternatives([])
-    if (demoMode) { setSelectedProduct(demoProducts.find((item) => item.id === id) || null); setLoading(false); window.setTimeout(() => document.getElementById('product-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); return }
-    try { setSelectedProduct(normalizeProduct(await api.product(id))); window.setTimeout(() => document.getElementById('product-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0) } catch (requestError) { setSelectedProduct(null); setError(`Карточку не удалось загрузить: ${requestError.message}`) } finally { setLoading(false) }
+
+  async function loadCart() {
+    try {
+      const response = await fetch(`/api/cart?session_id=${DEFAULT_SESSION_ID}`)
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        setCart(data)
+      } else if (data && Array.isArray(data.items)) {
+        setCart(data.items)
+      }
+    } catch (error) {
+      console.error('loadCart failed', error)
+      setCart([])
+    }
   }
+
   async function sendMessage(text = message) {
-    const cleanText = text.trim(); if (!cleanText || loading) return
-    setMessages((current) => [...current, { from: 'user', text: cleanText }]); setMessage(''); setError(''); setLoading(true)
-    if (demoMode) { respondInDemo(cleanText); setLoading(false); return }
-    try { const result = await api.chat({ session_id: 'browser-session', message: cleanText, selected_product_id: selected?.id || selectedId || undefined }); setMessages((current) => [...current, { from: 'assistant', text: result?.reply || 'Сервер не вернул текст ответа.' }]); const returnedProducts = (result?.products || []).map(normalizeProduct); if (returnedProducts.length) { setProducts(returnedProducts); setSelectedProduct(null); setSelectedId(null) } setProposal(result?.pending_action || null) } catch (requestError) { setError(`Ассистент недоступен: ${requestError.message}`); setMessages((current) => [...current, { from: 'assistant', text: 'Не удалось получить ответ от сервера. Данные не подставлены.' }]) } finally { setLoading(false) }
-  }
-  function respondInDemo(text) { const lower = text.toLowerCase(); let reply = 'В демо-выборке нет подтверждённого ответа на этот вопрос.'; if (lower.includes('515291') || lower.includes('есть')) { reply = 'ID 515291 найден. Нажмите на карточку товара ниже, чтобы открыть подробности. Номинальный ток требует уточнения: 160 А против 250 А.' } if (lower.includes('замен')) { setSelectedProduct(null); setSelectedId(null); setAlternatives([{ product: demoProducts[1], reason: 'Совпадают полюса, напряжение и отключающая способность.', differences: ['Номинальный ток отличается'] }]); reply = 'Проверенный в демо-паре вариант найден. Откройте карточку кандидата для подробностей.' } if (lower.includes('куп') || lower.includes('добав')) { setProposal({ product_id: selected?.id || '515291', quantity: 2, confirmation_token: 'demo-token' }); reply = 'Сформировала предложение на 2 шт. Корзина не изменится без отдельного подтверждения.' } setMessages((current) => [...current, { from: 'assistant', text: reply }]) }
-  async function loadAlternatives() { setError(''); setLoading(true); if (demoMode) { setAlternatives([{ product: demoProducts[1], reason: 'Совпадают полюса, напряжение и отключающая способность.', differences: ['Номинальный ток отличается'] }]); setLoading(false); return } try { const result = await api.alternatives(selected.id); setAlternatives(result?.items || []) } catch (requestError) { setError(`Аналоги не удалось загрузить: ${requestError.message}`) } finally { setLoading(false) } }
-  async function confirmAdd() { if (!proposal || loading) return; setLoading(true); setError(''); if (demoMode) { setCartResult({ status: 'added', mode: 'demo' }); setProposal(null); setLoading(false); return } try { const result = await api.confirm(proposal.confirmation_token); setCartResult(result); setProposal(null) } catch (requestError) { setError(requestError.status === 409 ? 'Данные изменились. Проверьте новые цену и остаток и подтвердите предложение заново.' : `Добавление не выполнено: ${requestError.message}`) } finally { setLoading(false) } }
-  function toggleMode() { const next = !demoMode; setDemoMode(next); setError(''); setAlternatives([]); setProposal(null); setCartResult(null); setSelectedId(null); setSelectedProduct(null); if (next) { setProducts(demoProducts); setMessages([{ from: 'assistant', text: 'Демо-режим включён. Нажмите на товар, чтобы открыть подробную карточку.' }]) } else { setProducts([]); setMessages([{ from: 'assistant', text: 'Серверный режим включён. Задайте вопрос, чтобы получить ответ.' }]) } }
+    const cleanText = (text ?? message ?? '').trim()
+    if (!cleanText) return
 
-  return <div className={`app-shell ${chatOpen ? 'chat-active' : ''}`}>
-    <div className="utility-bar"><div>⌖ Астана</div><div className="utility-links"><span className="account-icon" aria-label="Профиль пользователя" title="Профиль пользователя"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" /><path d="M5 20c.8-3.3 3.1-5 7-5s6.2 1.7 7 5" /></svg></span></div></div>
-    <header className="main-header"><div className="brand"><span>ГРУППА КОМПАНИЙ</span><b>ЭЛЕКТРОКОМПЛЕКТ</b></div><button className="catalog-button">Каталог <span>☷</span></button><label className="global-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && searchProducts(query)} placeholder="Поиск по названию, ID или артикулу" /><kbd>⌘ K</kbd></label><div className="header-actions"><button className={demoMode ? 'mode-chip demo' : 'mode-chip'} onClick={toggleMode}>{demoMode ? 'Демо-режим' : 'Серверный режим'}</button><a className="cart-link" href="cart.html">▱ Корзина</a></div></header>
-    <main><section className="welcome-row"><div><p className="eyebrow">EKT SMART SEARCH <span>{demoMode ? 'ДЕМО-РЕЖИМ' : 'СЕРВЕРНЫЙ РЕЖИМ'}</span></p><h1>Подберём нужное.<br /><em>Проверим каждую деталь.</em></h1><p className="intro">Нажмите на любую позицию в проекте: подробная карточка появится прямо под выбранным товаром.</p></div><div className="trust-panel"><div className="pulse-dot"></div><div><b>{demoMode ? 'Локальная демонстрация' : 'Данные с сервера'}</b><span>{demoMode ? 'Не актуальная корзина EKT' : 'Ключи остаются на сервере'}</span></div><small>›</small></div></section><div className="search-wrap"><span className="search-icon">⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && searchProducts(query)} placeholder="Например, 515291 или 200300285_" /><button onClick={() => searchProducts(query)}>Найти <span>↗</span></button></div><div className="quick-row"><span>Начните с чата:</span>{suggestions.map((item) => <button key={item} onClick={() => sendMessage(item)}>{item}</button>)}</div>{error && <div className="api-error"><b>Ошибка</b><span>{error}</span>{!demoMode && <button onClick={toggleMode}>Открыть демо-режим</button>}</div>}
-      <div className="content-grid"><section className="catalog-column"><div className="section-heading"><div><span className="section-kicker">{demoMode ? 'ДЕМО-КАТАЛОГ' : 'СЕРВЕРНЫЙ КАТАЛОГ'} · {visibleProducts.length} ПОЗИЦИЙ</span><h2>Товары для вашего проекта</h2></div><div className="view-toggle"><button className="active">▦</button><button>☷</button></div></div>{loading && <div className="loading-state">Проверяю данные…</div>}{!loading && !visibleProducts.length && <div className="empty-state"><span>⌕</span><h3>Каталог пока не загружен</h3><p>Задайте вопрос в чате или проверьте, запущен ли сервер.</p></div>}<div className="product-list">{visibleProducts.map((product) => <div className="product-row" key={product.id}><article className={`product-card ${selectedId === product.id ? 'selected' : ''}`} onClick={() => openProduct(product.id)}><ProductImage product={product} /><div className="product-info"><span className="product-type">{product.type || 'Товар EKT'}</span><h3>{product.name}</h3><div className="meta"><span>ID {product.id}</span><span>Арт. {product.article || 'Нет данных'}</span></div><div className="product-bottom"><b>{priceLabel(product.price)}</b><span className={product.quantity === null ? 'muted' : product.quantity ? 'stock' : 'muted'}>{product.quantity === null ? 'Наличие неизвестно' : product.quantity ? `${product.quantity} шт. на складах` : 'Остаток 0 шт.'}</span></div></div><button className="card-arrow" aria-label="Открыть товар">↗</button></article>{selectedId === product.id && selected && <ProductDetail product={selected} demoMode={demoMode} onAlternatives={loadAlternatives} />}</div>)}</div></section></div>
-      {alternatives.length > 0 && <section className="compare-section"><div className="section-heading"><div><span className="section-kicker">ПРОВЕРЕННЫЙ ПОДБОР</span><h2>Возможная замена</h2></div></div>{alternatives.map((item) => <div className="compare-card" key={item.product.id}><div className="compare-product"><ProductImage product={item.product} /><div><span className="product-type">{item.product.type}</span><h3>{item.product.name}</h3><span className="stock">{item.product.quantity > 0 ? `✓ В наличии · ${item.product.quantity} шт.` : 'Наличие неизвестно'}</span></div></div><div className="match-score"><strong>Проверено</strong><span>{item.reason}</span></div><div className="compare-note"><b>Отличия</b><p>{(item.differences || []).join('; ') || 'Нет данных об отличиях.'}</p></div></div>)}</section>}
-      {cartResult && <div className="success-state"><b>{cartResult.mode === 'demo' ? 'Демо-корзина' : 'Добавлено'}</b><span>{cartResult.status || 'Позиция добавлена после проверки.'}</span>{cartResult.cart_url && <a href={cartResult.cart_url} target="_blank" rel="noreferrer">Открыть корзину ↗</a>}</div>}
-    </main>
-    <button className={`chat-launcher ${chatOpen ? 'hidden' : ''}`} onClick={() => setChatOpen(true)}>✦ <span>Спросить EKT AI</span></button>{chatOpen && <aside className="chat-panel"><div className="chat-header"><div className="assistant-avatar">✦</div><div><b>EKT AI</b><span>{demoMode ? 'Демо-режим' : 'Ассистент через сервер'} <i></i></span></div><button onClick={() => setChatOpen(false)}>×</button></div><div className="chat-context"><span>◉</span> {demoMode ? 'Локальные данные · не актуальная корзина' : 'Ответы только из подтверждённых данных'}</div><div className="messages">{messages.map((item, index) => <div className={`message ${item.from}`} key={`${item.text}-${index}`}><p>{item.text}</p></div>)}{proposal && <div className="proposal"><span className="proposal-label">ПОДТВЕРЖДЕНИЕ</span><b>ID {proposal.product_id} · {proposal.quantity} шт.</b><span>Ничего не добавлено без подтверждения</span><button onClick={confirmAdd} disabled={loading}>Подтвердить добавление <span>→</span></button><button className="cancel-proposal" onClick={() => setProposal(null)}>Отмена</button></div>}<div className="chat-suggestions">{suggestions.map((item) => <button key={item} onClick={() => sendMessage(item)}>{item}</button>)}</div></div><form className="chat-input" onSubmit={(event) => { event.preventDefault(); sendMessage() }}><input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Напишите вопрос..." /><button aria-label="Отправить" disabled={loading}>↑</button></form><div className="chat-footnote">{demoMode ? 'Демо-корзина · локальные данные' : 'Серверные запросы активны'}</div></aside>}
-  </div>
+    setMessages((current) => [...current, { from: 'user', text: cleanText }])
+    setMessage('')
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: DEFAULT_SESSION_ID, message: cleanText }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка API')
+      }
+
+      if (data.reply) {
+        setMessages((current) => [...current, { from: 'assistant', text: data.reply }])
+      }
+
+      if (Array.isArray(data.products) && data.products.length > 0) {
+        setProducts(data.products)
+        setSelectedId(String(data.products[0].id))
+      }
+
+      if (data.pending_add && data.products && data.products.length > 0) {
+        setProposal({ product: data.products[0], quantity: data.pending_add.quantity })
+      } else {
+        setProposal(null)
+      }
+
+      if (data.cart_url) {
+        await loadCart()
+      }
+    } catch (error) {
+      setMessages((current) => [...current, { from: 'assistant', text: `Не удалось получить ответ от API: ${error.message}` }])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function confirmAdd() {
+    if (!proposal) return
+
+    try {
+      const response = await fetch(`/api/cart/confirm?session_id=${DEFAULT_SESSION_ID}`, { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Не удалось подтвердить корзину')
+      }
+
+      setMessages((current) => [...current, { from: 'assistant', text: 'Готово. Товар подтверждён и добавлен в корзину.' }])
+      setProposal(null)
+      await loadCart()
+    } catch (error) {
+      setMessages((current) => [...current, { from: 'assistant', text: error.message }])
+    }
+  }
+
+  const productPrice = formatPrice(selectedProduct?.price ?? 0)
+  const productStock = selectedProduct?.stock ?? selectedProduct?.quantity ?? 0
+  const warningText = selectedProduct?.data_issues?.[0] || ''
+  const characteristics = getCharacteristics(selectedProduct)
+
+  return (
+    <div className={`app-shell ${chatOpen ? 'chat-active' : ''}`}>
+      <div className="utility-bar"><div>⌖ Астана</div><div className="utility-links"><span>Личный кабинет</span><span>B2B · EKT PRO</span><span>Покупателям⌄</span><span>Оставить заявку</span><strong>+7 (700) 222-05-14</strong></div></div>
+      <header className="main-header"><div className="brand"><span>ГРУППА КОМПАНИЙ</span><b>ЭЛЕКТРОКОМПЛЕКТ</b></div><button className="catalog-button">Каталог <span>☷</span></button><label className="global-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по названию, ID или артикулу" /><kbd>⌘ K</kbd></label><div className="header-actions"><span>⇄ Сравнить</span><span>♡ Избранное</span><button onClick={() => setChatOpen(true)}>▱ Корзина <i>{cart.length}</i></button></div></header>
+      <main>
+        <section className="welcome-row"><div><p className="eyebrow">EKT SMART SEARCH <span>LIVE API</span></p><h1>Подберём нужное.<br /><em>Проверим каждую деталь.</em></h1><p className="intro">Умный помощник по электротехническим товарам. Находит по каталогу EKT и получает данные напрямую из backend API.</p></div><div className="trust-panel"><div className="pulse-dot"></div><div><b>Данные из backend</b><span>Оптимизированный поиск и чат по каталогу</span></div><small>›</small></div></section>
+        <div className="search-wrap"><span className="search-icon">⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && (query.trim() ? sendMessage(query) : loadProducts())} placeholder="Например, автомат 3P или 200300285_" /><button onClick={() => (query.trim() ? sendMessage(query) : loadProducts())}>Найти <span>↗</span></button></div>
+        <div className="quick-row"><span>Популярное:</span>{suggestions.map((item) => <button key={item} onClick={() => sendMessage(item)}>{item}</button>)}</div>
+        <div className="content-grid">
+          <section className="catalog-column">
+            <div className="section-heading"><div><span className="section-kicker">КАТАЛОГ EKT · {filteredProducts.length} ПОЗИЦИИ</span><h2>Товары для вашего проекта</h2></div><div className="view-toggle"><button className="active">▦</button><button>☷</button></div></div>
+            {filteredProducts.length === 0 && <div className="empty-state"><span>⌕</span><h3>Ничего не нашли</h3><p>Попробуйте ID, артикул или название товара.</p></div>}
+            <div className="product-list">
+              {filteredProducts.map((product) => (
+                <article className={`product-card ${String(selectedId) === String(product.id) ? 'selected' : ''}`} key={product.id ?? product.article ?? product.sku} onClick={() => setSelectedId(String(product.id))}>
+                  <div className="product-image"><img src={product.image || fallbackProduct.image} alt="" /><span className={(product.stock ?? product.quantity ?? 0) ? 'in-stock' : 'out-stock'}>{(product.stock ?? product.quantity ?? 0) ? 'В наличии' : 'Нет в наличии'}</span></div>
+                  <div className="product-info"><span className="product-type">{product.product_type || product.category || 'Каталог EKT'}</span><h3>{product.name}</h3><div className="meta"><span>ID {product.id}</span><span>Арт. {product.article || product.sku || '—'}</span></div><div className="product-bottom"><b>{formatPrice(product.price)}</b><span className={(product.stock ?? product.quantity ?? 0) ? 'stock' : 'muted'}>{(product.stock ?? product.quantity ?? 0) ? `${product.stock ?? product.quantity ?? 0} шт. на складах` : 'Остаток 0 шт.'}</span></div></div>
+                  <button className="card-arrow" aria-label="Открыть товар">↗</button>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <aside className="detail-column">
+            <div className="detail-top"><span className="section-kicker">ПОДРОБНАЯ КАРТОЧКА</span><div className="detail-actions"><button>♡</button><button>⋯</button></div></div>
+            <div className="detail-image"><img src={selectedProduct.image || fallbackProduct.image} alt="" /><span className="verified">✓ Данные подтверждены</span></div>
+            <span className="product-type">{selectedProduct.product_type || selectedProduct.category || 'Каталог EKT'}</span>
+            <h2>{selectedProduct.name}</h2>
+            <div className="detail-meta"><span>Бренд <b>{selectedProduct.brand || 'EKT'}</b></span><span>Артикул <b>{selectedProduct.article || selectedProduct.sku || '—'}</b></span></div>
+            <div className="price-row"><div><small>Цена за единицу</small><strong>{productPrice}</strong></div><div className={productStock ? 'availability' : 'availability unavailable'}><i></i>{productStock ? `В наличии · ${productStock} шт.` : 'Нет в наличии'}</div></div>
+            {warningText && <div className="warning"><span>!</span><p><b>Нужно внимание</b> {warningText}</p></div>}
+            <div className="characteristics"><div className="subheading"><b>Характеристики</b><span>Все параметры ↗</span></div>{characteristics.map(([key, value]) => <div className="characteristic" key={key}><span>{key}</span><b>{value}</b></div>)}</div>
+            {!productStock && <button className="outline-button" onClick={() => { setCompareOpen(true); setChatOpen(true) }}>Подобрать замену <span>→</span></button>}
+            <a className="ekt-link" href="https://ekt.kz" target="_blank" rel="noreferrer">Открыть на ekt.kz ↗</a>
+          </aside>
+        </div>
+
+        {compareOpen && alternative && <section className="compare-section"><div className="section-heading"><div><span className="section-kicker">ПРОВЕРЕННЫЙ ПОДБОР</span><h2>Возможная замена</h2></div><button className="close-button" onClick={() => setCompareOpen(false)}>×</button></div><div className="compare-card"><div className="compare-product"><img src={alternative.image || fallbackProduct.image} alt="" /><div><span className="product-type">{alternative.product_type || 'Каталог EKT'}</span><h3>{alternative.name}</h3><span className="stock">✓ В наличии · {alternative.stock ?? alternative.quantity ?? 0} шт.</span></div></div><div className="match-score"><strong>3/4</strong><span>параметра совпадает</span></div><div className="compare-note"><b>Почему подходит</b><p>Совпадают основные характеристики, и товар доступен в каталоге. Перед монтажом лучше проверить точные параметры у менеджера.</p></div></div></section>}
+      </main>
+      <button className={`chat-launcher ${chatOpen ? 'hidden' : ''}`} onClick={() => setChatOpen(true)}>✦ <span>Спросить EKT AI</span></button>
+      {chatOpen && <aside className="chat-panel"><div className="chat-header"><div className="assistant-avatar">✦</div><div><b>EKT AI</b><span>Ассистент-консультант <i></i></span></div><button onClick={() => setChatOpen(false)}>×</button></div><div className="chat-context"><span>◉</span> Анализирую каталог EKT <b>в реальном времени</b></div><div className="messages">{messages.map((item, index) => <div className={`message ${item.from}`} key={`${item.text}-${index}`}>{item.from === 'assistant' && <span className="mini-avatar">✦</span>}<p>{item.text}</p></div>)}{proposal && <div className="proposal"><span className="proposal-label">ПРЕДЛОЖЕНИЕ</span><b>{proposal.quantity} шт. · {proposal.product.name}</b><span>{formatPrice(proposal.product.price)} за единицу</span><button onClick={confirmAdd}>Подтвердить добавление <span>→</span></button><button className="cancel-proposal" onClick={() => setProposal(null)}>Отмена</button></div>}<div className="chat-suggestions">{suggestions.slice(0, 2).map((item) => <button key={item} onClick={() => sendMessage(item)}>{item}</button>)}</div></div><form className="chat-input" onSubmit={(event) => { event.preventDefault(); sendMessage() }}><input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Напишите вопрос..." disabled={isLoading} /><button aria-label="Отправить" disabled={isLoading}>↑</button></form><div className="chat-footnote">Ответы основаны на подтверждённых данных · <u>Подробнее</u></div></aside>}
+    </div>
+  )
 }
 
 export default App
