@@ -17,10 +17,10 @@ type Request struct {
 }
 
 type Response struct {
-	Reply      string             `json:"reply"`
-	Products   []catalog.Product  `json:"products,omitempty"`
-	PendingAdd *PendingAdd        `json:"pending_add,omitempty"`
-	CartURL    string             `json:"cart_url,omitempty"`
+	Reply      string            `json:"reply"`
+	Products   []catalog.Product `json:"products,omitempty"`
+	PendingAdd *PendingAdd       `json:"pending_add,omitempty"`
+	CartURL    string            `json:"cart_url,omitempty"`
 }
 
 type PendingAdd struct {
@@ -107,12 +107,12 @@ func (service *Service) generateLLMReply(request Request) (string, bool) {
 		return "", false
 	}
 	ctx := context.Background()
-	prompt := fmt.Sprintf("Ты помощник по каталогу EKT. Ответь на вопрос клиента кратко и по делу. Используй только данные каталога и оферты, а не общие предположения.\n\nВопрос клиента: %s\n\nЕсли это неуловимый вопрос про товар, уточни артикул или тип оборудования, но не придумывай остатки и цену.", request.Message)
-	reply, err := service.llm.Generate(ctx, "Ты консультант EKT по электрооборудованию. Отвечай сухо, по делу, без выдумок, и всегда опирайся на каталог и доступные данные.", prompt)
+	prompt := fmt.Sprintf("{\"message\":%q,\"catalog_results\":[],\"product_details\":[],\"confirmed_alternatives\":[],\"purchase_terms\":null,\"cart_result\":null}", request.Message)
+	reply, err := service.llm.Generate(ctx, assistantSystemPrompt, prompt)
 	if err != nil || strings.TrimSpace(reply) == "" {
 		return "", false
 	}
-	return reply, true
+	return parseStructuredReply(reply), true
 }
 
 func normalizeQuery(message string) string {

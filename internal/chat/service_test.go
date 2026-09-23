@@ -66,3 +66,10 @@ func TestNormalizeQueryPreservesTrailingUnderscoreInArticle(t *testing.T) {
 		t.Fatalf("expected article identifier to keep trailing underscore, got %q", query)
 	}
 }
+
+func TestParseStructuredReply(t *testing.T) {
+	reply := parseStructuredReply(`{"intent":"other","reply":"Уточните артикул.","product_ids":[],"alternative_ids":[],"requested_action":null,"needs_clarification":true,"needs_human":false}`)
+	if reply != "Уточните артикул." {
+		t.Fatalf("unexpected parsed reply: %q", reply)
+	}
+}

@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1/chat/completions}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b}
+      EKT_PRODUCTS_FILES: ${EKT_PRODUCTS_FILES:-}
+      DATABASE_URL: ${DATABASE_URL:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${EKT_PRODUCTS_DIR:-./data}:/data:ro
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"

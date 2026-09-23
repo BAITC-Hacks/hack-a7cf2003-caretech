@@ -1,0 +1,85 @@
+# EKT AI Assistant Backend
+
+Минимальный backend-прототип для кейса HackAlem AI: чат-консультант каталога ekt.kz.
+
+## Архитектура
+
+Сейчас приложение собрано в одном Go-процессе, но границы уже разделены по ответственности:
+
+- `Product` и `productsHandler` - каталог, характеристики, цена, остатки и сертификаты.
+- `chatHandler` - обработка запроса клиента и состояние ожидающего подтверждения.
+- `findAlternatives` - объяснимый подбор аналога по категории и ключевой характеристике.
+- `Cart` и `confirmCartHandler` - корзина; изменение возможно только после явного подтверждения.
+- `Session` - временный контекст диалога. В production его нужно вынести в Redis или PostgreSQL.
+
+Для production-версии слой хранения следует заменить на PostgreSQL, каталог и остатки получать из API ekt.kz, а `chatHandler` разделить на API, оркестратор ассистента и RAG/LLM-адаптер. Цена и наличие должны приходить только из каталога, а не из ответа модели.
+
+## Запуск
+
+```powershell
+$env:EKT_PRODUCTS_FILES="C:\path\to\ekt_products_page_1.json,C:\path\to\ekt_products_page_2.json"
+go run ./cmd/server
+```
+
+Сервис запускается на `http://localhost:8080`.
+
+Если `EKT_PRODUCTS_FILES` не задан, backend использует небольшой demo-каталог. Файлы должны быть выгрузками EKT с полем `items`; при совпадении `id` запись из файла, указанного позже, заменяет предыдущую.
+
+Для Ollama или другого OpenAI-compatible сервера можно использовать `LLM_BASE_URL`, `LLM_MODEL` и необязательный `LLM_API_KEY`. Старые переменные `NVIDIA_*` остаются совместимыми.
+
+## Запуск через Docker
+
+Скопируйте EKT JSON в папку `data`, создайте `.env` на основе `.env.example` и укажите контейнерный путь:
+
+```env
+EKT_PRODUCTS_DIR=./data
+EKT_PRODUCTS_FILES=/data/EKT_40_подробных_карточек_по_двум_JSON.json
+LLM_BASE_URL=http://host.docker.internal:11434/v1/chat/completions
+LLM_MODEL=qwen2.5:7b
+LLM_API_KEY=ollama
+```
+
+Запуск всего frontend + backend:
+
+```powershell
+docker compose up --build
+```
+
+Frontend будет доступен на `http://localhost:5173`, backend health — на `http://localhost:8080/health`. Для Ollama на Brev замените `LLM_BASE_URL` на опубликованный Brev endpoint.
+
+## API
+
+### Проверка состояния
+
+`GET /health`
+
+### Поиск по каталогу
+
+`GET /api/products?q=ABB`
+
+### Чат
+
+`POST /api/chat`
+
+```json
+{
+  "session_id": "demo-1",
+  "message": "Есть ABB-S201-C16?"
+}
+```
+
+Ответ на вопрос о товаре создаёт `pending_add`, но не меняет корзину. Для подтверждения можно отправить сообщение `Да, добавь` в тот же чат или вызвать `POST /api/cart/confirm?session_id=demo-1`.
+
+### Просмотр корзины
+
+`GET /api/cart?session_id=demo-1`
+
+## Демо-сценарии
+
+1. Спросить `ABB-S201-C16` и убедиться, что возвращаются наличие, характеристики и сертификат.
+2. Спросить `EKF-BA-16` и получить аналог с объяснением по категории и току.
+3. Спросить про доставку или оплату.
+4. Спросить про товар, затем проверить корзину: до подтверждения она пуста.
+5. Отправить `Да, добавь`, затем открыть ссылку корзины из ответа.
+
+Данные в прототипе синтетические. Платёжные данные не принимаются и не хранятся.
