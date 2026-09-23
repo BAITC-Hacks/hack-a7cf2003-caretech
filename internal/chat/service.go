@@ -1,12 +1,14 @@
 package chat
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
 
 	"hackalem-ekt-backend/internal/cart"
 	"hackalem-ekt-backend/internal/catalog"
+	"hackalem-ekt-backend/internal/llm"
 )
 
 type Request struct {
@@ -33,12 +35,27 @@ type session struct {
 type Service struct {
 	catalog  catalog.Repository
 	carts    cart.Store
+	llm      llm.Client
 	mu       sync.Mutex
 	sessions map[string]*session
 }
 
-func NewService(products catalog.Repository, carts cart.Store) *Service {
-	return &Service{catalog: products, carts: carts, sessions: make(map[string]*session)}
+type Option func(*Service)
+
+func WithLLMClient(client llm.Client) Option {
+	return func(service *Service) {
+		service.llm = client
+	}
+}
+
+func NewService(products catalog.Repository, carts cart.Store, opts ...Option) *Service {
+	service := &Service{catalog: products, carts: carts, sessions: make(map[string]*session)}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(service)
+		}
+	}
+	return service
 }
 
 func (service *Service) Handle(request Request) Response {
@@ -47,7 +64,10 @@ func (service *Service) Handle(request Request) Response {
 
 	current := service.getSession(request.SessionID)
 	message := strings.ToLower(strings.TrimSpace(request.Message))
-	if isConfirmation(message) && current.pending != nil {
+	if isConfirmation(message) {
+		if current.pending == nil {
+			return Response{Reply: "Нет ожидающего добавления в корзину. Сначала уточните товар и подтвердите его добавление."}
+		}
 		pending := *current.pending
 		if err := service.carts.Add(request.SessionID, pending.SKU, pending.Quantity); err != nil {
 			return Response{Reply: err.Error()}
@@ -74,20 +94,41 @@ func (service *Service) Handle(request Request) Response {
 	if strings.Contains(message, "достав") || strings.Contains(message, "оплат") || strings.Contains(message, "услов") {
 		return Response{Reply: "Оплата: безналичный расчет и картой на сайте. Доставка рассчитывается по городу и объему заказа. Минимальная партия зависит от позиции; точные условия подтвердит менеджер."}
 	}
+	if service.llm != nil {
+		if reply, ok := service.generateLLMReply(request); ok {
+			return Response{Reply: reply}
+		}
+	}
 	return Response{Reply: "Уточните артикул или название товара. Я проверю наличие, характеристики, сертификат и аналоги."}
 }
 
+func (service *Service) generateLLMReply(request Request) (string, bool) {
+	if service.llm == nil {
+		return "", false
+	}
+	ctx := context.Background()
+	prompt := fmt.Sprintf("Ты помощник по каталогу EKT. Ответь на вопрос клиента кратко и по делу. Используй только данные каталога и оферты, а не общие предположения.\n\nВопрос клиента: %s\n\nЕсли это неуловимый вопрос про товар, уточни артикул или тип оборудования, но не придумывай остатки и цену.", request.Message)
+	reply, err := service.llm.Generate(ctx, "Ты консультант EKT по электрооборудованию. Отвечай сухо, по делу, без выдумок, и всегда опирайся на каталог и доступные данные.", prompt)
+	if err != nil || strings.TrimSpace(reply) == "" {
+		return "", false
+	}
+	return reply, true
+}
+
 func normalizeQuery(message string) string {
-	fields := strings.FieldsFunc(message, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == ' ')
-	})
-	filtered := make([]string, 0, len(fields))
-	for _, field := range fields {
-		switch field {
+	message = strings.ToLower(strings.TrimSpace(message))
+	tokens := strings.Fields(message)
+	filtered := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		token = strings.Trim(token, "\t\n\r.,!?;:()[]{}\"'`<>/\\")
+		if token == "" {
+			continue
+		}
+		switch token {
 		case "есть", "нужен", "нужна", "нужно", "хочу", "покажи", "подскажи", "товар", "поиск", "ищу", "можно", "какой", "какая":
 			continue
 		default:
-			filtered = append(filtered, field)
+			filtered = append(filtered, token)
 		}
 	}
 	return strings.TrimSpace(strings.Join(filtered, " "))

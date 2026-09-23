@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"sort"
 	"strings"
 	"sync"
 )
@@ -27,43 +28,83 @@ func NewMemoryStore(products []Product) *MemoryStore {
 }
 
 func (store *MemoryStore) Search(query string) []Product {
-	query = strings.ToLower(strings.TrimSpace(query))
+	query = strings.TrimSpace(query)
+	if query == "" {
+		store.mu.RLock()
+		defer store.mu.RUnlock()
+		products := make([]Product, 0, len(store.products))
+		for _, product := range store.products {
+			products = append(products, product)
+		}
+		sort.Slice(products, func(i, j int) bool {
+			if products[i].Stock != products[j].Stock {
+				return products[i].Stock > products[j].Stock
+			}
+			return products[i].Name < products[j].Name
+		})
+		return products
+	}
+
+	queryLower := strings.ToLower(query)
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	matches := make([]Product, 0)
-	exactMatches := make([]Product, 0)
+	results := make([]Product, 0, len(store.products))
 	for _, product := range store.products {
-		searchText := strings.ToLower(strings.Join([]string{
-			product.SKU,
-			product.Article,
-			product.SupplierArticle,
-			product.Name,
-			product.Brand,
-			product.Category,
-			product.ProductType,
-		}, " "))
-		if query == "" {
-			matches = append(matches, product)
-			continue
+		score := productMatchScore(product, queryLower)
+		if score > 0 {
+			results = append(results, product)
 		}
+	}
 
-		candidate := strings.ToLower(product.SKU) == query ||
-			strings.ToLower(product.Article) == query ||
-			strings.ToLower(product.SupplierArticle) == query
-		if candidate {
-			exactMatches = append(exactMatches, product)
-			continue
+	sort.Slice(results, func(i, j int) bool {
+		leftScore := productMatchScore(results[i], queryLower)
+		rightScore := productMatchScore(results[j], queryLower)
+		if leftScore != rightScore {
+			return leftScore > rightScore
 		}
-		if strings.Contains(searchText, query) {
-			matches = append(matches, product)
+		if results[i].Stock != results[j].Stock {
+			return results[i].Stock > results[j].Stock
 		}
-	}
-	if len(exactMatches) > 0 {
-		return append(exactMatches, matches...)
-	}
-	return matches
+		return results[i].Name < results[j].Name
+	})
+	return results
 }
+
+func productMatchScore(product Product, query string) int {
+	if query == "" {
+		return 0
+	}
+
+	if strings.EqualFold(product.SKU, query) ||
+		strings.EqualFold(product.Article, query) ||
+		strings.EqualFold(product.SupplierArticle, query) {
+		return 100
+	}
+
+	searchText := strings.ToLower(strings.Join([]string{
+		product.SKU,
+		product.Article,
+		product.SupplierArticle,
+		product.Name,
+		product.Brand,
+		product.Category,
+		product.ProductType,
+	}, " "))
+	if strings.Contains(searchText, query) {
+		if strings.Contains(strings.ToLower(product.SKU), query) ||
+			strings.Contains(strings.ToLower(product.Article), query) ||
+			strings.Contains(strings.ToLower(product.SupplierArticle), query) {
+			return 90
+		}
+		if strings.Contains(strings.ToLower(product.Name), query) {
+			return 70
+		}
+		return 50
+	}
+	return 0
+}
+
 
 func (store *MemoryStore) FindBySKU(sku string) (Product, bool) {
 	store.mu.RLock()
@@ -76,7 +117,11 @@ func (store *MemoryStore) Alternatives(source Product) []Product {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	result := make([]Product, 0)
+	candidates := make([]struct {
+		product Product
+		score   int
+	}, 0)
+
 	for _, product := range store.products {
 		if product.SKU == source.SKU {
 			continue
@@ -84,20 +129,51 @@ func (store *MemoryStore) Alternatives(source Product) []Product {
 		if product.Quantity <= 0 && product.Stock <= 0 {
 			continue
 		}
-		if product.Category != source.Category {
+		if source.Category != "" && product.Category != "" && source.Category != product.Category {
 			continue
 		}
 
-		currentMatch := product.Characteristics.Current != "" && source.Characteristics.Current != "" &&
-			strings.EqualFold(strings.TrimSpace(product.Characteristics.Current), strings.TrimSpace(source.Characteristics.Current))
-			voltageMatch := product.Characteristics.Voltage != "" && source.Characteristics.Voltage != "" &&
-			strings.EqualFold(strings.TrimSpace(product.Characteristics.Voltage), strings.TrimSpace(source.Characteristics.Voltage))
-			polesMatch := product.Characteristics.Poles != "" && source.Characteristics.Poles != "" &&
-			strings.EqualFold(strings.TrimSpace(product.Characteristics.Poles), strings.TrimSpace(source.Characteristics.Poles))
-
-		if currentMatch || (voltageMatch && polesMatch) {
-			result = append(result, product)
+		score := 0
+		if strings.EqualFold(strings.TrimSpace(product.Category), strings.TrimSpace(source.Category)) {
+			score += 1
 		}
+		if product.ProductType != "" && source.ProductType != "" &&
+			strings.EqualFold(strings.TrimSpace(product.ProductType), strings.TrimSpace(source.ProductType)) {
+			score += 1
+		}
+		if product.Characteristics.Current != "" && source.Characteristics.Current != "" &&
+			strings.EqualFold(strings.TrimSpace(product.Characteristics.Current), strings.TrimSpace(source.Characteristics.Current)) {
+			score += 5
+		}
+		if product.Characteristics.Voltage != "" && source.Characteristics.Voltage != "" &&
+			strings.EqualFold(strings.TrimSpace(product.Characteristics.Voltage), strings.TrimSpace(source.Characteristics.Voltage)) {
+			score += 3
+		}
+		if product.Characteristics.Poles != "" && source.Characteristics.Poles != "" &&
+			strings.EqualFold(strings.TrimSpace(product.Characteristics.Poles), strings.TrimSpace(source.Characteristics.Poles)) {
+			score += 2
+		}
+		if score > 0 {
+			candidates = append(candidates, struct {
+				product Product
+				score   int
+			}{product: product, score: score})
+		}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		if candidates[i].product.Stock != candidates[j].product.Stock {
+			return candidates[i].product.Stock > candidates[j].product.Stock
+		}
+		return candidates[i].product.Name < candidates[j].product.Name
+	})
+
+	result := make([]Product, 0, len(candidates))
+	for _, candidate := range candidates {
+		result = append(result, candidate.product)
 	}
 	return result
 }

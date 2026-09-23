@@ -84,3 +84,34 @@ func TestAlternativesMatchCategoryAndCurrent(t *testing.T) {
 		t.Fatalf("expected same current rating, got %q != %q", alternatives[0].Characteristics.Current, outOfStock.Characteristics.Current)
 	}
 }
+
+func TestSearchRanksExactIdentifierMatchesHigherThanNameMatches(t *testing.T) {
+	store := NewMemoryStore(DemoProducts())
+	results := store.Search("027228")
+	if len(results) == 0 {
+		t.Fatal("expected result")
+	}
+	if results[0].SupplierArticle != "027228" {
+		t.Fatalf("expected supplier article match ranked first, got %+v", results[0])
+	}
+
+	results = store.Search("abb-s201-c16")
+	if len(results) == 0 {
+		t.Fatal("expected result by sku")
+	}
+	if results[0].SKU != "ABB-S201-C16" {
+		t.Fatalf("expected sku result ranked first, got %q", results[0].SKU)
+	}
+}
+
+func TestAlternativesPrioritizeCurrentMatchOverGenericCategoryMatch(t *testing.T) {
+	store := NewMemoryStore(DemoProducts())
+	outOfStock := store.Search("EKF-BA-16")[0]
+	alternatives := store.Alternatives(outOfStock)
+	if len(alternatives) < 2 {
+		t.Fatal("expected multiple candidates with same category and current")
+	}
+	if alternatives[0].Characteristics.Current != outOfStock.Characteristics.Current {
+		t.Fatalf("expected current-compatible item first, got %q", alternatives[0].Characteristics.Current)
+	}
+}
