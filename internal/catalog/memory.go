@@ -13,6 +13,14 @@ type MemoryStore struct {
 func NewMemoryStore(products []Product) *MemoryStore {
 	bySKU := make(map[string]Product, len(products))
 	for _, product := range products {
+		product.Stock = product.Quantity
+		product.CertificateURL = ""
+		if len(product.CertificateURLs) > 0 {
+			product.CertificateURL = product.CertificateURLs[0]
+		}
+		if product.SKU == "" {
+			product.SKU = product.Article
+		}
 		bySKU[product.SKU] = product
 	}
 	return &MemoryStore{products: bySKU}
@@ -25,7 +33,15 @@ func (store *MemoryStore) Search(query string) []Product {
 
 	result := make([]Product, 0)
 	for _, product := range store.products {
-		searchText := strings.ToLower(product.SKU + " " + product.Name + " " + product.Category)
+		searchText := strings.ToLower(strings.Join([]string{
+			product.SKU,
+			product.Article,
+			product.SupplierArticle,
+			product.Name,
+			product.Brand,
+			product.Category,
+			product.ProductType,
+		}, " "))
 		if query == "" || strings.Contains(searchText, query) {
 			result = append(result, product)
 		}
@@ -46,7 +62,19 @@ func (store *MemoryStore) Alternatives(source Product) []Product {
 
 	result := make([]Product, 0)
 	for _, product := range store.products {
-		if product.SKU != source.SKU && product.Stock > 0 && product.Category == source.Category && product.Characteristics["ток"] == source.Characteristics["ток"] {
+		if product.SKU == source.SKU {
+			continue
+		}
+		if product.Stock <= 0 && product.Quantity <= 0 {
+			continue
+		}
+		if product.Category != source.Category {
+			continue
+		}
+		if product.Characteristics.Current == "" || source.Characteristics.Current == "" {
+			continue
+		}
+		if product.Characteristics.Current == source.Characteristics.Current {
 			result = append(result, product)
 		}
 	}
@@ -54,9 +82,73 @@ func (store *MemoryStore) Alternatives(source Product) []Product {
 }
 
 func DemoProducts() []Product {
-	return []Product{
-		{SKU: "ABB-S201-C16", Name: "Автоматический выключатель ABB S201 C16", Category: "Автоматы", Price: 4200, Stock: 12, Characteristics: map[string]string{"полюса": "1P", "ток": "16 A", "характеристика": "C"}, CertificateURL: "https://ekt.kz/certificates/abb-s201-c16.pdf"},
-		{SKU: "EKF-BA-16", Name: "Автоматический выключатель EKF BA 47-29 C16", Category: "Автоматы", Price: 1850, Stock: 0, Characteristics: map[string]string{"полюса": "1P", "ток": "16 A", "характеристика": "C"}},
-		{SKU: "IEK-C25", Name: "Автоматический выключатель IEK C25", Category: "Автоматы", Price: 2100, Stock: 7, Characteristics: map[string]string{"полюса": "1P", "ток": "25 A", "характеристика": "C"}},
+	first := Product{
+		ID:              515291,
+		Article:         "200300285_",
+		SupplierArticle: "027228",
+		SKU:             "ABB-S201-C16",
+		Name:            "Автоматический выключатель ABB S201 C16",
+		Description:     "Автоматический выключатель DRX250 MT 3P 160А 18kA (арт. 027228) Legrand – мощное защитное устройство для предотвращения перегрузок и коротких замыканий в электрических сетях.",
+		Price:           4200,
+		Quantity:        12,
+		Brand:           "ABB",
+		ProductType:     "Автоматический выключатель",
+		Category:        "Автоматы",
+		Characteristics: ProductCharacteristics{
+			Poles:            "1",
+			Current:          "16 A",
+			Voltage:          "230В",
+			BreakingCapacity: "6кА",
+			InstallationType: "Винтовое",
+		},
+		RelatedProductIDs: []int{48783, 23466, 28727},
+		MinimumMultiple:   1,
+		Image:             "https://ekt.kz/example/abb-s201-c16.jpg",
+		URL:               "https://ekt.kz/catalog/abb-s201-c16",
+		DataIssues:        []string{"Номинальный ток из карточки требует проверки; значения потенциально расходятся с описанием."},
+		Stock:            12,
+		AvailableStores: []StoreInfo{{ID: 1, Name: "Алматы", Quantity: 12}},
 	}
+
+	second := Product{
+		ID:              1001,
+		Article:         "EKF-BA-16",
+		SupplierArticle: "EKF-BA-16",
+		SKU:             "EKF-BA-16",
+		Name:            "Автоматический выключатель EKF BA 47-29 C16",
+		Description:     "Автоматический выключатель EKF BA 47-29 C16 для стандартных электросетей.",
+		Category:        "Автоматы",
+		Price:           1850,
+		Quantity:        0,
+		Brand:           "EKF",
+		ProductType:     "Автоматический выключатель",
+		Characteristics: ProductCharacteristics{
+			Poles:   "1",
+			Current: "16 A",
+			Voltage: "220В",
+		},
+		Stock: 0,
+	}
+
+	third := Product{
+		ID:              1002,
+		Article:         "IEK-C25",
+		SupplierArticle: "IEK-C25",
+		SKU:             "IEK-C25",
+		Name:            "Автоматический выключатель IEK C25",
+		Description:     "Автоматический выключатель IEK C25 для силовых нагрузок.",
+		Category:        "Автоматы",
+		Price:           2100,
+		Quantity:        7,
+		Brand:           "IEK",
+		ProductType:     "Автоматический выключатель",
+		Characteristics: ProductCharacteristics{
+			Poles:   "1",
+			Current: "25 A",
+			Voltage: "220В",
+		},
+		Stock: 7,
+	}
+
+	return []Product{first, second, third}
 }
