@@ -1,0 +1,36 @@
+{
+  "id": 515291,
+  "article": "200300285_",
+  "supplier_article": "027228",
+  "name": "027228 АВ DRX250 MT 3ф 160А 18ka Legrand (1)",
+  "description": "Автоматический выключатель DRX250 MT 3P 160А 18kA (арт. 027228) Legrand – мощное защитное устройство для предотвращения перегрузок и коротких замыканий в электрических сетях. Основные характеристики: серия DRX250 MT; количество полюсов 3; номинальный ток 160А; отключающая способность 18kA; номинальное напряжение 400В AC; производитель Legrand.",
+  "price": 64920,
+  "quantity": 23,
+  "available_stores": [
+    {"id": 3, "name": "Шымкент (ул.Байдукова)", "quantity": 2},
+    {"id": 13, "name": "Алматы", "quantity": 5},
+    {"id": 19, "name": "Тараз", "quantity": 2},
+    {"id": 20, "name": "Атырау", "quantity": 3},
+    {"id": 21, "name": "Караганда", "quantity": 2},
+    {"id": 24, "name": "Нур-Султан", "quantity": 8},
+    {"id": 25, "name": "Шымкент (Тассай)", "quantity": 1}
+  ],
+  "brand": "Legrand",
+  "product_type": "Автоматический выключатель",
+  "category": null,
+  "characteristics": {
+    "poles": "3",
+    "current": null,
+    "voltage": "400В",
+    "breaking_capacity": "18кА",
+    "installation_type": "Винтовое"
+  },
+  "related_product_ids": [48783, 23466, 28727],
+  "minimum_multiple": 1,
+  "certificate_urls": null,
+  "image": "https://ekt.kz/upload/iblock/1ca/8mdfx6517jvalt5da1n9865q2fzpj6jp/027228_av_drx250_mt_3f_160a_18ka_legrand_1.jpg",
+  "url": "https://ekt.kz/catalog/nizkovoltnaya_apparatura/silovye_avtomaticheskie_vyklyuchateli/drx250_mt_10_250_a_legrand/027228_av_drx250_mt_3f_160a_18ka_legrand_1/",
+  "data_issues": [
+    "Номинальный ток: name и description = 160 А; properties.NOMINALNYY_TOK = 250 А. Значение требует проверки."
+  ]
+}
